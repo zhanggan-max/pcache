@@ -6,13 +6,13 @@ import (
 	"log"
 	"time"
 
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/naming/endpoints"
-	"go.etcd.io/etcd/clientv3"
 )
 
 var defaultEtcdConfig = clientv3.Config{
 	Endpoints:   []string{"localhost:2397"},
-	DialTiemout: 5 * time.Second,
+	DialTimeout: 5 * time.Second,
 }
 
 // etcdAdd 在租赁模式添加一对 kv 至 etcd
@@ -21,7 +21,7 @@ func etcdAdd(c *clientv3.Client, lid clientv3.LeaseID, service string, addr stri
 	if err != nil {
 		return err
 	}
-	return em.AddEndPoint(c.Ctx(), service+"/"+addr, endpoints.Endpoint{Addr: addr}, clientv3.WithLease(lid))
+	return em.AddEndpoint(c.Ctx(), service+"/"+addr, endpoints.Endpoint{Addr: addr}, clientv3.WithLease(lid))
 }
 
 // Register 注册一个服务到 etcd

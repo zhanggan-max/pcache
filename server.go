@@ -12,7 +12,7 @@ import (
 	"pcache/consistenthash"
 	pb "pcache/pcachepb"
 
-	"go.etcd.io/etcd/clientv3"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc"
 )
 
@@ -23,7 +23,7 @@ const (
 
 var defaultEtcdConfig = clientv3.Config{
 	Endpoints:   []string{"localhost:2379"},
-	DialTiemout: 5 * time.Second,
+	DialTimeout: 5 * time.Second,
 }
 
 type server struct {
