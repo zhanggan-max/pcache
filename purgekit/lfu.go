@@ -11,21 +11,24 @@ type LFUCache struct {
 	freqList map[int]*list.List
 	// cache 存储键值对应，降低查询的成本
 	cache map[interface{}]*list.Element
+	// minFrequency 代表一个一个缓存第一次添加时的 frequency
+	minFrequency int
 }
 
 // 在节点中存储的条目
 type lfuEntry struct {
-	key   Key
-	value interface{}
-	freq  int
+	key       Key
+	value     interface{}
+	frequency int // freq 代表当前条目被查询的次数
 }
 
-func newLFUCache(maxEntries int, onEnvited func(key Key, value interface{})) *LFUCache {
+func NewLFUCache(maxEntries int, onEnvited func(key Key, value interface{})) *LFUCache {
 	return &LFUCache{
-		maxEntries: maxEntries,
-		onEnvited:  onEnvited,
-		freqList:   make(map[int]*list.List),
-		cache:      make(map[interface{}]*list.Element),
+		maxEntries:   maxEntries,
+		onEnvited:    onEnvited,
+		minFrequency: 0,
+		freqList:     make(map[int]*list.List),
+		cache:        make(map[interface{}]*list.Element),
 	}
 }
 
@@ -34,23 +37,18 @@ func (c *LFUCache) Get(key Key) (value interface{}, ok bool) {
 		return
 	}
 	if ele, ok := c.cache[key]; ok {
-		c.increaseFreq(ele)
+		kv := ele.Value.(*lfuEntry)
+		c.freqList[kv.frequency].Remove(ele)
+		kv.frequency += 1
+		if ll, ok := c.freqList[kv.frequency]; ok {
+			ll.PushFront(ele)
+		} else {
+			ll := list.New()
+			ll.PushFront(ele)
+			c.freqList[kv.frequency] = ll
+		}
 	}
 	return
-}
-
-func (c *LFUCache) increaseFreq(ele *list.Element) {
-	kv := ele.Value.(*lfuEntry)
-	freq := kv.freq
-	oldlist := c.freqList[freq]
-	oldlist.Remove(ele)
-	freq += 1
-	if _, ok := c.freqList[freq]; !ok {
-		c.freqList[freq] = list.New()
-	}
-	newlist := c.freqList[freq]
-	kv.freq = freq
-	newlist.PushFront(kv)
 }
 
 func (c *LFUCache) Add(key Key, value interface{}) {
@@ -61,12 +59,27 @@ func (c *LFUCache) Add(key Key, value interface{}) {
 	if ele, ok := c.cache[key]; ok {
 		kv := ele.Value.(*lfuEntry)
 		kv.value = value
-		c.increaseFreq(ele)
-		return
+		c.freqList[kv.frequency].Remove(ele)
+		kv.frequency += 1
+		if ll, ok := c.freqList[kv.frequency]; ok {
+			ll.PushFront(ele)
+		} else {
+			ll := list.New()
+			ll.PushFront(ele)
+			c.freqList[kv.frequency] = ll
+		}
 	}
-	kv := &lfuEntry{key: key, value: value, freq: 0}
-	ele := c.freqList[0].PushFront(kv)
+	entry := &lfuEntry{key: key, value: value, frequency: c.minFrequency}
+	if ll, ok := c.freqList[entry.frequency]; ok {
+		ele := ll.PushFront(entry)
+		c.cache[key] = ele
+	}
+	ll := list.New()
+	ele := ll.PushFront(entry)
 	c.cache[key] = ele
+	if c.maxEntries != 0 && c.Len() > c.maxEntries {
+		c.RemoveOldest()
+	}
 }
 
 func (c *LFUCache) Remove(key Key) {
@@ -75,13 +88,29 @@ func (c *LFUCache) Remove(key Key) {
 	}
 	if ele, ok := c.cache[key]; ok {
 		kv := ele.Value.(*lfuEntry)
-		delete(c.cache, kv.key)
-		c.freqList[kv.freq].Remove(ele)
+		delete(c.cache, key)
+		c.freqList[kv.frequency].Remove(ele)
 	}
 }
 
-func (c *LFUCache) RemoveLeastFreq() {
+func (c *LFUCache) RemoveOldest() {
 	if c.cache == nil {
 		return
 	}
+	ll := c.freqList[c.minFrequency]
+	ele := ll.Back()
+	ll.Remove(ele)
+	if c.onEnvited != nil {
+		kv := ele.Value.(*lfuEntry)
+		c.onEnvited(kv.key, kv.value)
+	}
+}
+
+func (c *LFUCache) Len() int {
+	return len(c.cache)
+}
+
+func (c *LFUCache) Clear() {
+	c.cache = nil
+	c.freqList = nil
 }
