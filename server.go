@@ -68,7 +68,7 @@ func (s *server) Get(ctx context.Context, in *pb.Request) (*pb.Response, error) 
 // Start 启动服务器，todo: 并将其注册到 etcd 中
 func (s *server) Start() error {
 	s.mu.Lock()
-	if s.status == true {
+	if s.status {
 		s.mu.Unlock()
 		return fmt.Errorf("server already started")
 	}
@@ -78,7 +78,7 @@ func (s *server) Start() error {
 	port := strings.Split(s.addr, ":")[1]
 	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {
-		return fmt.Errorf("failed to listen: v", err)
+		return fmt.Errorf("failed to listen: %v", err)
 	}
 	grpcServer := grpc.NewServer()
 	pb.RegisterPcacheServer(grpcServer, s)
@@ -124,7 +124,7 @@ func (s *server) Pick(key string) (Fetcher, bool) {
 // 停止 server 运行
 func (s *server) Stop() {
 	s.mu.Lock()
-	if s.status == false {
+	if !s.status {
 		s.mu.Unlock()
 		return
 	}
