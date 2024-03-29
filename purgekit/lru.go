@@ -11,9 +11,6 @@ type LRUCache struct {
 	cache map[interface{}]*list.Element
 }
 
-// 任意可比较的值都能作为键
-type Key interface{}
-
 // entry 是在 list 中使用的结构
 type entry struct {
 	key   Key
