@@ -1,6 +1,8 @@
 package purgekit
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestLFUAdd(t *testing.T) {
 	lfu := NewLFUCache(0, nil)

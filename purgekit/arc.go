@@ -115,3 +115,7 @@ func (c *ARCache) replace(contains bool) {
 func (c *ARCache) Len() int {
 	return c.t1.Len() + c.t2.Len()
 }
+
+func (c *ARCache) RegisterOnEnvicted(onfunc OnEnvictedFunc) {
+	c.onEnvicted = onfunc
+}

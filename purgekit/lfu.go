@@ -25,7 +25,7 @@ func NewLFUCache(maxEntries int, onEnvicted func(key Key, value interface{})) *L
 		onEnvicted: onEnvicted,
 		freqList:   make(map[int]*list.List),
 		cache:      make(map[interface{}]*list.Element),
-		minFreq:    0,
+		minFreq:    -1,
 	}
 }
 
@@ -35,13 +35,12 @@ func (c *LFUCache) Get(key Key) (value interface{}, ok bool) {
 		return
 	}
 	if ele, ok := c.cache[key]; ok {
-		c.Jump(ele)
 		kv := ele.Value.(*lfuEntry)
-		// todo: 这里有一个 bug
+		c.Jump(ele)
 		if kv.freq == c.minFreq && c.freqList[c.minFreq].Len() == 0 {
 			c.minFreq += 1
 		}
-		return ele.Value.(*lfuEntry).value, true
+		return kv.value, true
 	}
 	return
 }
@@ -138,4 +137,8 @@ func (c *LFUCache) Peek(key Key) (value interface{}, ok bool) {
 		return ele.Value.(*lfuEntry).value, true
 	}
 	return
+}
+
+func (c *LFUCache) RegisterOnEnvicted(onEf OnEnvictedFunc) {
+	c.onEnvicted = onEf
 }

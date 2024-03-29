@@ -7,7 +7,7 @@ import (
 
 type cache struct {
 	m          sync.RWMutex
-	lru        *purgekit.LRUCache
+	lru        purgekit.Cache
 	maxEntries int
 }
 
@@ -15,7 +15,7 @@ func (c *cache) add(key string, value ByteView) {
 	c.m.RLock()
 	defer c.m.RUnlock()
 	if c.lru == nil {
-		c.lru = purgekit.NewLRUCache(c.maxEntries)
+		panic("please init cache first")
 	}
 	c.lru.Add(key, value)
 }

@@ -17,6 +17,7 @@ type entry struct {
 	value interface{}
 }
 
+// NewLRUCache 返回一个 LRUCache 实例
 func NewLRUCache(maxEntries int) *LRUCache {
 	return &LRUCache{
 		maxEntries: maxEntries,
@@ -71,11 +72,12 @@ func (c *LRUCache) RemoveOldest() (key Key, value interface{}, ok bool) {
 		return
 	}
 	ele := c.ll.Back()
-	kv := ele.Value.(*entry)
 	if ele != nil {
+		kv := ele.Value.(*entry)
 		c.removeElement(ele)
+		return kv.key, kv.value, true
 	}
-	return kv.key, kv.value, true
+	return
 }
 
 // removeElement 从缓存中删除指定的缓存
@@ -105,6 +107,8 @@ func (c *LRUCache) Clear() {
 	c.ll = nil
 }
 
+// Contains 判断 key 是否在缓存中，这个函数只会在 arc 中使用
+// Contains 不会改变缓存的状态
 func (c *LRUCache) Contains(key Key) bool {
 	if c.cache == nil {
 		return false
@@ -113,6 +117,7 @@ func (c *LRUCache) Contains(key Key) bool {
 	return ok
 }
 
+// Peek 获取对应的缓存而不会改变缓存的状态
 func (c *LRUCache) Peek(key Key) (value interface{}, ok bool) {
 	if c.cache == nil {
 		return
