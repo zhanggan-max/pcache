@@ -66,14 +66,16 @@ func (c *LRUCache) Remove(key Key) {
 }
 
 // 从缓存中移除缓存中最老的条目
-func (c *LRUCache) RemoveOldest() {
+func (c *LRUCache) RemoveOldest() (key Key, value interface{}, ok bool) {
 	if c.cache == nil {
 		return
 	}
 	ele := c.ll.Back()
+	kv := ele.Value.(*entry)
 	if ele != nil {
 		c.removeElement(ele)
 	}
+	return kv.key, kv.value, true
 }
 
 // removeElement 从缓存中删除指定的缓存
@@ -101,4 +103,22 @@ func (c *LRUCache) Clear() {
 	}
 	c.cache = nil
 	c.ll = nil
+}
+
+func (c *LRUCache) Contains(key Key) bool {
+	if c.cache == nil {
+		return false
+	}
+	_, ok := c.cache[key]
+	return ok
+}
+
+func (c *LRUCache) Peek(key Key) (value interface{}, ok bool) {
+	if c.cache == nil {
+		return
+	}
+	if ele, ok := c.cache[key]; ok {
+		return ele.Value.(*entry).value, true
+	}
+	return
 }

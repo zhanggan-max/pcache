@@ -89,15 +89,16 @@ func (c *LFUCache) Remove(key Key) {
 }
 
 // RemoveLeastUsed 移除使用频率最少，使用时间最久远的键值对
-func (c *LFUCache) RemoveLeastUsed() {
+func (c *LFUCache) RemoveLeastUsed() (key Key, value interface{}, ok bool) {
 	if c.cache == nil {
 		return
 	}
 	// todo: 这里有一个 bug
 	ele := c.freqList[c.minFreq].Back()
 	c.freqList[c.minFreq].Remove(ele)
-	key := ele.Value.(*lfuEntry).key
-	delete(c.cache, key)
+	kv := ele.Value.(*lfuEntry)
+	delete(c.cache, kv.key)
+	return kv.key, kv.value, true
 }
 
 func (c *LFUCache) Len() int {
@@ -117,4 +118,24 @@ func (c *LFUCache) Jump(ele *list.Element) {
 	ll := list.New()
 	ll.PushFront(ele)
 	c.freqList[kv.freq] = ll
+}
+
+func (c *LFUCache) Contains(key Key) bool {
+	if c.cache == nil {
+		return false
+	}
+	if _, ok := c.cache[key]; ok {
+		return true
+	}
+	return false
+}
+
+func (c *LFUCache) Peek(key Key) (value interface{}, ok bool) {
+	if c.cache == nil {
+		return
+	}
+	if ele, ok := c.cache[key]; ok {
+		return ele.Value.(*lfuEntry).value, true
+	}
+	return
 }

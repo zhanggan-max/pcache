@@ -1,149 +1,117 @@
 package purgekit
 
-import (
-	"container/list"
-)
-
 type ARCache struct {
 	maxEntries int
-	onEnvited  func(key Key, value interface{})
+	onEnvicted func(key Key, value interface{})
 
-	t1 *list.List
-	b1 *list.List
-
-	t2 *list.List
-	b2 *list.List
-
-	cache map[interface{}]*list.Element
+	p  int
+	t1 *LRUCache
+	b1 *LRUCache
+	t2 *LFUCache
+	b2 *LFUCache
 }
 
-type arcEntry struct {
-	key    Key
-	value  interface{}
-	parent *list.List
-}
-
-func newARCache(maxEntries int, onEnvited func(key Key, value interface{})) *ARCache {
+func NewARCache(maxEntries int, onEnvicted func(key Key, value interface{})) *ARCache {
 	return &ARCache{
 		maxEntries: maxEntries,
-		onEnvited:  onEnvited,
-		t1:         list.New(),
-		t2:         list.New(),
-		b1:         list.New(),
-		b2:         list.New(),
-		cache:      make(map[interface{}]*list.Element),
+		onEnvicted: onEnvicted,
+		p:          0,
+		t1:         NewLRUCache(maxEntries),
+		t2:         NewLFUCache(maxEntries, onEnvicted),
+		b1:         NewLRUCache(maxEntries),
+		b2:         NewLFUCache(maxEntries, onEnvicted),
 	}
 }
 
 func (c *ARCache) Get(key Key) (value interface{}, ok bool) {
-	if c.cache == nil {
-		return
+	if val, ok := c.t1.Peek(key); ok {
+		c.t1.Remove(key)
+		c.t2.Add(key, val)
+		return val, true
 	}
-	if ele, ok := c.cache[key]; ok {
-		kv := ele.Value.(*arcEntry)
-		switch kv.parent {
-		case c.t1:
-			c.t1.Remove(ele)
-			c.t2.PushFront(ele)
-			kv.parent = c.t2
-		case c.t2:
-			c.t2.MoveToFront(ele)
-		case c.b1:
-			c.b1.Remove(ele)
-			c.t2.PushFront(ele)
-			kv.parent = c.t2
-		case c.b2:
-			c.b2.Remove(ele)
-			c.t2.PushFront(ele)
-			kv.parent = c.t2
-		}
-		if c.t1.Len()+c.t2.Len() > c.maxEntries/2 {
-			if c.b1.Len()+c.b2.Len() > c.maxEntries/2 {
-				if c.b1 == nil || c.b1.Len() == 0 {
-					back := c.b2.Back()
-					c.b2.Remove(back)
-					back2 := c.t2.Back()
-					c.t2.Remove(back2)
-					c.b2.PushFront(back2)
-				} else {
-					back := c.b1.Back()
-					c.b1.Remove(back)
-					c.b2.PushFront(c.t2.Remove(c.t2.Back()))
-				}
-			} else {
-				c.b2.PushFront(c.t2.Remove(c.t2.Back()))
-			}
-		}
-		return kv.value, true
+	if val, ok := c.t2.Get(key); ok {
+		return val, ok
 	}
 	return
 }
 
-// 回调函数没有使用
 func (c *ARCache) Add(key Key, value interface{}) {
-	if c.cache == nil {
-		c.cache = make(map[interface{}]*list.Element)
-		c.t1 = list.New()
-		c.t2 = list.New()
-		c.b1 = list.New()
-		c.b2 = list.New()
+	if c.t1.Contains(key) {
+		c.t1.Remove(key)
+		c.t2.Add(key, value)
+		return
 	}
-	if ele, ok := c.cache[key]; ok {
-		kv := ele.Value.(*arcEntry)
-		kv.value = value
-		c.Get(key)
+	if c.t2.Contains(key) {
+		c.t2.Add(key, value)
+		return
 	}
-	ele := c.t1.PushFront(&arcEntry{key: key, value: value, parent: c.t1})
-	c.cache[key] = ele
-	if c.t1.Len()+c.t2.Len() > c.maxEntries/2 {
-		if c.b1.Len()+c.b2.Len() < c.maxEntries/2 {
-			c.b1.PushFront(c.t1.Remove(c.t1.Back()))
+
+	if c.b1.Contains(key) {
+		delta := 1
+		b1len := c.b1.Len()
+		b2len := c.b2.Len()
+		if b2len > b1len {
+			delta = b2len / b1len
+		}
+		if c.p+delta >= c.maxEntries {
+			c.p = c.maxEntries
 		} else {
-			if c.b1 == nil || c.b1.Len() == 0 {
-				c.b2.Remove(c.b2.Back())
-				c.b1.PushFront(c.t1.Remove(c.t1.Back()))
-			} else {
-				c.b1.Remove(c.b1.Back())
-				c.b1.PushFront(c.t1.Remove(c.t1.Back()))
-			}
+			c.p += delta
+		}
+		if c.t1.Len()+c.t2.Len() >= c.maxEntries {
+			c.replace(false)
+		}
+		c.b1.Remove(key)
+		c.t2.Add(key, value)
+		return
+	}
+
+	if c.b2.Contains(key) {
+		delta := 1
+		b1len := c.b1.Len()
+		b2len := c.b2.Len()
+		if b1len > b2len {
+			delta = b1len / b2len
+		}
+		if delta >= c.p {
+			c.p = 0
+		} else {
+			c.p -= delta
+		}
+		if c.t1.Len()+c.t2.Len() >= c.maxEntries {
+			c.replace(true)
+		}
+		c.b2.Remove(key)
+		c.t2.Add(key, value)
+		return
+	}
+	if c.t1.Len()+c.t2.Len() >= c.maxEntries {
+		c.replace(false)
+	}
+	if c.b1.Len() > c.maxEntries-c.p {
+		c.b1.RemoveOldest()
+	}
+	if c.b2.Len() > c.p {
+		c.b2.RemoveLeastUsed()
+	}
+	c.t1.Add(key, value)
+}
+
+func (c *ARCache) replace(contains bool) {
+	t1len := c.t1.Len()
+	if t1len > 0 && (t1len > c.p || contains) {
+		k, _, ok := c.t1.RemoveOldest()
+		if ok {
+			c.b1.Add(k, nil)
+		}
+	} else {
+		k, _, ok := c.t2.RemoveLeastUsed()
+		if ok {
+			c.b2.Add(k, nil)
 		}
 	}
 }
 
-func (c *ARCache) Remove(key Key) {
-	if c.cache == nil {
-		return
-	}
-	if ele, ok := c.cache[key]; ok {
-		kv := ele.Value.(*arcEntry)
-		delete(c.cache, key)
-		kv.parent.Remove(ele)
-	}
-}
-
-func (c *ARCache) RemoveOldest() {
-	if c.cache == nil {
-		return
-	}
-	if c.b1 == nil || c.b1.Len() == 0 {
-		c.b2.Remove(c.b2.Back())
-		return
-	}
-	c.b1.Remove(c.b1.Back())
-}
-
 func (c *ARCache) Len() int {
 	return c.t1.Len() + c.t2.Len()
-}
-
-func (c *ARCache) Total() int {
-	return c.Len() + c.b1.Len() + c.b2.Len()
-}
-
-func (c *ARCache) Clear() {
-	c.cache = nil
-	c.t1 = nil
-	c.t2 = nil
-	c.b1 = nil
-	c.b2 = nil
 }
