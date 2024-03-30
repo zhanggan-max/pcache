@@ -43,7 +43,7 @@ func NewGroup(name string, maxEntries int, getter Getter) *Group {
 		name:   name,
 		getter: getter,
 		// mainCache 的初始化未完成
-		mainCache: &cache{maxEntries: maxEntries},
+		mainCache: newCache(maxEntries),
 		flight:    &singleflight.Flight{},
 	}
 	mu.Lock()

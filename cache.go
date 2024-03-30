@@ -11,6 +11,13 @@ type cache struct {
 	maxEntries int
 }
 
+func newCache(maxEntries int) *cache {
+	return &cache{
+		maxEntries: maxEntries,
+		lru:        purgekit.NewCache("lru", maxEntries, nil),
+	}
+}
+
 func (c *cache) add(key string, value ByteView) {
 	c.m.RLock()
 	defer c.m.RUnlock()
