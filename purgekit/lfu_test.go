@@ -32,3 +32,22 @@ func TestRemoveLeastUsed(t *testing.T) {
 		t.Fatalf("key1 should have been removed, but got reply: %v", value)
 	}
 }
+
+func TestFreq(t *testing.T) {
+	lfu := NewLFUCache(0, nil)
+	lfu.Add("key1", 1)
+	lfu.Add("key2", 2)
+	if lfu.minFreq != 0 {
+		t.Fatalf("minFreq should be 0, but got: %v", lfu.minFreq)
+	}
+
+	lfu.Get("key1")
+	if lfu.minFreq != 0 {
+		t.Fatalf("minFreq should be 0, but gout %v", lfu.minFreq)
+	}
+
+	lfu.Get("key2")
+	if lfu.minFreq != 1 {
+		t.Fatalf("minFreq should be 1, but got: %v", lfu.minFreq)
+	}
+}

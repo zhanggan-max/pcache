@@ -99,7 +99,7 @@ func (c *ARCache) Add(key Key, value interface{}) {
 
 func (c *ARCache) replace(contains bool) {
 	t1len := c.t1.Len()
-	if t1len > 0 && (t1len > c.p || contains) {
+	if t1len > 0 && (t1len > c.p || (t1len == c.p && contains)) {
 		k, _, ok := c.t1.RemoveOldest()
 		if ok {
 			c.b1.Add(k, nil)

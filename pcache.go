@@ -23,7 +23,7 @@ func (f GetterFunc) Get(key string) ([]byte, error) {
 type Group struct {
 	name      string               // name 是当前 Group 的名字
 	getter    Getter               // getter 从数据源获得数据
-	mainCache cache                // mainCache 是真正的缓存
+	mainCache *cache               // mainCache 是真正的缓存
 	server    Picker               // server 从注册节点中选择节点
 	flight    *singleflight.Flight // flight 确保一个键同时只有一次请求
 }
@@ -43,7 +43,7 @@ func NewGroup(name string, maxEntries int, getter Getter) *Group {
 		name:   name,
 		getter: getter,
 		// mainCache 的初始化未完成
-		mainCache: cache{maxEntries: maxEntries},
+		mainCache: &cache{maxEntries: maxEntries},
 		flight:    &singleflight.Flight{},
 	}
 	mu.Lock()

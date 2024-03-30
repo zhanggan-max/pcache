@@ -36,10 +36,10 @@ func (c *LFUCache) Get(key Key) (value interface{}, ok bool) {
 	}
 	if ele, ok := c.cache[key]; ok {
 		kv := ele.Value.(*lfuEntry)
-		c.Jump(ele)
-		if kv.freq == c.minFreq && c.freqList[c.minFreq].Len() == 0 {
+		if kv.freq == c.minFreq && c.freqList[c.minFreq].Len() == 1 {
 			c.minFreq += 1
 		}
+		c.Jump(ele)
 		return kv.value, true
 	}
 	return
