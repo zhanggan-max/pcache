@@ -11,6 +11,7 @@ import (
 
 	"pcache/consistenthash"
 	pb "pcache/pcachepb"
+	"pcache/registry"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc"
@@ -83,7 +84,18 @@ func (s *server) Start() error {
 	grpcServer := grpc.NewServer()
 	pb.RegisterPcacheServer(grpcServer, s)
 
-	//todo: etcd registe
+	go func() {
+		err := registry.Register("pcache", s.addr, s.stopSignal)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		close(s.stopSignal)
+		err = lis.Close()
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		log.Printf("%s Revoke service and close tcp socket ok.", s.addr)
+	}()
 	s.mu.Unlock()
 	if err := grpcServer.Serve(lis); s.status && err != nil {
 		return fmt.Errorf("failed to serve: %v", err)
