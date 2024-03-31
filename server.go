@@ -96,6 +96,7 @@ func (s *server) Start() error {
 		}
 		log.Printf("%s Revoke service and close tcp socket ok.", s.addr)
 	}()
+	go s.SetPeers(s.addr)
 	s.mu.Unlock()
 	if err := grpcServer.Serve(lis); s.status && err != nil {
 		return fmt.Errorf("failed to serve: %v", err)
@@ -113,7 +114,6 @@ func (s *server) SetPeers(peerAddrs ...string) {
 	s.clients = make(map[string]*client)
 	for _, peerAddr := range peerAddrs {
 		service := fmt.Sprintf("pcache%s", peerAddr)
-		// todo: 实现 newclient 方法
 		s.clients[peerAddr] = NewClient(service)
 	}
 }
