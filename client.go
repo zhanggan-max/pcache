@@ -4,10 +4,9 @@ import (
 	"context"
 	"fmt"
 	pb "pcache/pcachepb"
-	"pcache/registry"
 	"time"
 
-	clientv3 "go.etcd.io/etcd/client/v3"
+	"google.golang.org/grpc"
 )
 
 type client struct {
@@ -16,12 +15,7 @@ type client struct {
 
 // Fetch 从 remote peer 获取对应的缓存值
 func (c *client) Fetch(group string, key string) ([]byte, error) {
-	cli, err := clientv3.New(defaultEtcdConfig)
-	if err != nil {
-		return nil, err
-	}
-	defer cli.Close()
-	conn, err := registry.EtcdDial(cli, c.name)
+	conn, err := grpc.Dial(c.name)
 	if err != nil {
 		return nil, err
 	}

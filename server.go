@@ -7,13 +7,10 @@ import (
 	"net"
 	"strings"
 	"sync"
-	"time"
 
 	"pcache/consistenthash"
 	pb "pcache/pcachepb"
-	"pcache/registry"
 
-	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc"
 )
 
@@ -21,11 +18,6 @@ const (
 	defaultAddr    = "127.0.0.1:6324"
 	defaultRepicas = 50
 )
-
-var defaultEtcdConfig = clientv3.Config{
-	Endpoints:   []string{"localhost:2379"},
-	DialTimeout: 5 * time.Second,
-}
 
 type server struct {
 	pb.UnimplementedPcacheServer
@@ -83,19 +75,6 @@ func (s *server) Start() error {
 	}
 	grpcServer := grpc.NewServer()
 	pb.RegisterPcacheServer(grpcServer, s)
-
-	go func() {
-		err := registry.Register("pcache", s.addr, s.stopSignal)
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-		close(s.stopSignal)
-		err = lis.Close()
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-		log.Printf("%s Revoke service and close tcp socket ok.", s.addr)
-	}()
 	s.mu.Unlock()
 	if err := grpcServer.Serve(lis); s.status && err != nil {
 		return fmt.Errorf("failed to serve: %v", err)
